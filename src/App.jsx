@@ -22,18 +22,6 @@ import {
   Plus,
   FileText,
   CheckCircle2,
-  Clock,
-  Maximize2,
-  GripHorizontal,
-  AlertTriangle,
-  ChevronDown,
-  CornerDownRight,
-  ThumbsUp,
-  MoreVertical,
-  FileClock,
-  Eye,
-  LayoutGrid,
-  ArrowRightFromLine,
   Check,
   ArrowLeft,
   Star,
@@ -45,7 +33,16 @@ import {
   X,
   ClipboardList,
   Calendar,
-  DollarSign
+  DollarSign,
+  AlertTriangle,
+  CheckSquare,
+  CheckCircle,
+  Clock,
+  ArrowRightFromLine,
+  LayoutGrid,
+  Eye,
+  ChevronDown,
+  GripHorizontal
 } from 'lucide-react';
 import {
   DndContext,
@@ -142,11 +139,75 @@ const MyProjectsWidget = ({ dragHandleProps, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('projects-on');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
   const [isNewDropdownOpen, setIsNewDropdownOpen] = useState(false);
+  const [projects, setProjects] = useState(PROJECTS_DATA);
+  const lastProjectSyncRef = useRef(null);
+
+  // Polling for new project trigger from Interact Console (Market Brief)
+  useEffect(() => {
+    const checkProjectCookie = () => {
+      const match = document.cookie.match(new RegExp('(^| )omnify_create_projects_trigger=([^;]+)'));
+      if (match) {
+        const triggerData = decodeURIComponent(match[2]);
+        if (triggerData !== lastProjectSyncRef.current) {
+          lastProjectSyncRef.current = triggerData;
+          try {
+            const data = JSON.parse(triggerData);
+            console.log("Project sync trigger detected:", data);
+
+            const newProjects = [
+              {
+                id: Date.now() + 1,
+                name: data.briefName,
+                owner: "Jimmie Miller",
+                status: "Planning",
+                color: "orange",
+                due: "12/08/25",
+                update: "Auto-created from Market Brief",
+                documents: [
+                  { id: 1, name: `Market Brief - ${data.briefName}.docx`, date: new Date().toLocaleDateString(), size: "24 KB", type: "docx", user: "System" }
+                ]
+              },
+              {
+                id: Date.now() + 2,
+                name: `${data.briefName} - Media Planning`,
+                owner: "Jimmie Miller",
+                status: "Planning",
+                color: "orange",
+                due: "12/08/25",
+                update: "Auto-created from Market Brief",
+                documents: [
+                  { id: 1, name: `Market Brief - ${data.briefName}.docx`, date: new Date().toLocaleDateString(), size: "24 KB", type: "docx", user: "System" }
+                ]
+              },
+              {
+                id: Date.now() + 3,
+                name: `${data.briefName} - Creative Campaign`,
+                owner: "Jimmie Miller",
+                status: "Planning",
+                color: "orange",
+                due: "12/08/25",
+                update: "Auto-created from Market Brief",
+                documents: [
+                  { id: 1, name: `Market Brief - ${data.briefName}.docx`, date: new Date().toLocaleDateString(), size: "24 KB", type: "docx", user: "System" }
+                ]
+              }
+            ];
+
+            setProjects(prev => [...newProjects, ...prev]);
+          } catch (e) {
+            console.error("Error parsing project sync trigger", e);
+          }
+        }
+      }
+    };
+    const intervalId = setInterval(checkProjectCookie, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Filter logic
   const filteredProjects = activeTab === 'projects-on'
-    ? PROJECTS_DATA
-    : PROJECTS_DATA.filter(p => p.owner === "You"); // Mock filter
+    ? projects
+    : projects.filter(p => p.owner === "You" || p.owner === "Jimmie Miller"); // Mock filter
 
   // Sort logic
   const sortedProjects = React.useMemo(() => {
@@ -217,7 +278,11 @@ const MyProjectsWidget = ({ dragHandleProps, onNavigate }) => {
                     <span>From template</span>
                   </button>
                   <button
-                    onClick={() => onNavigate && onNavigate('project-detail')}
+                    onClick={() => {
+                      // Trigger sync to Interact Console via cookie
+                      document.cookie = "omnify_new_project_trigger=" + Date.now() + "; path=/; max-age=60";
+                      if (onNavigate) onNavigate('project-detail');
+                    }}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
                   >
                     <Layout size={16} />
@@ -282,7 +347,15 @@ const MyProjectsWidget = ({ dragHandleProps, onNavigate }) => {
                       <MoreHorizontal size={16} />
                     </div>
                   </td>
-                  <td className="py-2 px-2 font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer truncate max-w-[200px]" title={project.name}>{project.name}</td>
+                  <td
+                    className="py-2 px-2 font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer truncate max-w-[200px]"
+                    title={project.name}
+                    onClick={() => {
+                      if (onNavigate) onNavigate('project-detail', project);
+                    }}
+                  >
+                    {project.name}
+                  </td>
                   <td className="py-2 px-2">
                     <div className="w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center overflow-hidden" title={project.owner}>
                       <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${project.owner}`} alt="avatar" className="w-full h-full" />
@@ -922,6 +995,15 @@ const TaskDetailView = ({ task, onBack }) => {
       };
 
       setDocuments(prev => [newDoc, ...prev]); // Add to top
+
+      // Trigger document sync to Interact Console via cookie
+      const docCookieValue = JSON.stringify({
+        name: newDoc.name,
+        date: newDoc.date,
+        size: '24 KB', // Mock size
+        type: 'docx' // Mock type
+      });
+      document.cookie = `omnify_new_document_trigger=${encodeURIComponent(docCookieValue)}; path=/; max-age=60`;
     }
   };
 
@@ -1274,18 +1356,42 @@ const TaskDetailView = ({ task, onBack }) => {
   );
 };
 
-const ProjectDetailView = ({ onBack }) => {
+const ProjectDetailView = ({ onBack, project }) => { // Accept project prop
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [projectName, setProjectName] = useState(project?.name || "Untitled Project"); // Use synced name with fallback
+  const [activeTab, setActiveTab] = useState('tasks'); // Add activeTab state
+
+  // Use synced documents if available
+  const documents = project?.documents || [];
 
   const handleCreateTask = (newTask) => {
     setTasks([...tasks, newTask]);
   };
 
+  const handleNameChange = (e) => {
+    const newName = e.target.value;
+    setProjectName(newName);
+    // Sync to Interact Console
+    document.cookie = "omnify_project_name_trigger=" + encodeURIComponent(newName) + "; path=/; max-age=60";
+  };
+
   if (selectedTask) {
     return <TaskDetailView task={selectedTask} onBack={() => setSelectedTask(null)} />;
   }
+
+  const SIDEBAR_ITEMS = [
+    { id: 'updates', label: 'Updates', icon: MessageSquare },
+    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'details', label: 'Task Details', icon: List },
+    { id: 'subtasks', label: 'Subtasks', icon: CheckSquare },
+    { id: 'issues', label: 'Issues (0)', icon: AlertTriangle },
+    { id: 'hours', label: 'Hours', icon: Clock },
+    { id: 'approvals', label: 'Approvals', icon: CheckCircle },
+    { id: 'expenses', label: 'Expenses', icon: DollarSign },
+    { id: 'bookings', label: 'Bookings', icon: ArrowRightFromLine },
+  ];
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800">
@@ -1295,16 +1401,35 @@ const ProjectDetailView = ({ onBack }) => {
         onCreate={handleCreateTask}
       />
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 z-10">
+        <div className="flex items-center space-x-2 text-xs text-gray-500 mb-3">
+          <span className="bg-gray-100 dark:bg-gray-700 px-1 rounded text-gray-600 dark:text-gray-300">PROJECT</span>
+          <span className="font-medium text-gray-700 dark:text-gray-300">{projectName}</span>
+        </div>
+
         <div className="flex items-center space-x-4 mb-4">
-          <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center text-white">
-            <List size={20} />
+          <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center text-white shrink-0">
+            <CheckSquare size={24} />
           </div>
-          <input
-            type="text"
-            defaultValue="Untitled Project"
-            className="text-2xl font-bold text-blue-600 dark:text-blue-400 bg-transparent border-none focus:ring-0 p-0 w-full"
-          />
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-gray-500 uppercase">PROJECT</span>
+            </div>
+            <input
+              type="text"
+              value={projectName}
+              onChange={handleNameChange}
+              className="text-2xl font-bold text-gray-900 dark:text-white bg-transparent border-none focus:ring-0 p-0 w-full"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <button className="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors">
+              Share
+            </button>
+            <button className="p-1 text-gray-400 hover:text-gray-600">
+              <MoreHorizontal size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Metadata */}
@@ -1319,12 +1444,12 @@ const ProjectDetailView = ({ onBack }) => {
               <div className="w-5 h-5 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center overflow-hidden">
                 <User size={12} className="text-gray-500 dark:text-gray-300" />
               </div>
-              <span className="text-gray-900 dark:text-gray-200">Jimmie Miller</span>
+              <span className="text-gray-900 dark:text-gray-200">{project?.owner || "Jimmie Miller"}</span>
             </div>
           </div>
           <div>
             <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">Planned Completion Date</div>
-            <div className="font-medium text-gray-900 dark:text-gray-200">Dec 1, 2025</div>
+            <div className="font-medium text-gray-900 dark:text-gray-200">{project?.due || "Dec 1, 2025"}</div>
           </div>
           <div>
             <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">Condition</div>
@@ -1337,146 +1462,202 @@ const ProjectDetailView = ({ onBack }) => {
             <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">Status</div>
             <div className="flex items-center space-x-1 font-medium">
               <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              <span className="text-gray-900 dark:text-gray-200">Planning</span>
+              <span className="text-gray-900 dark:text-gray-200">{project?.status || "Planning"}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs/Toolbar */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-2 flex items-center space-x-6 text-sm">
-        <div className="flex items-center space-x-1 text-gray-900 dark:text-white font-semibold border-b-2 border-gray-900 dark:border-white pb-2 -mb-2.5">
-          <ArrowRightFromLine size={14} className="rotate-90" />
-          <span>Tasks</span>
-        </div>
-      </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
+        <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto">
+          <div className="flex items-center text-gray-500 hover:text-gray-700 px-6 py-3 text-sm cursor-pointer" onClick={onBack}>
+            <ArrowLeft size={14} className="mr-2" />
+            <span>Documents</span>
+          </div>
 
-      {/* Task Toolbar */}
-      <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
-        <button
-          onClick={() => setIsNewTaskModalOpen(true)}
-          className="flex items-center space-x-1 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium"
-        >
-          <Plus size={16} />
-          <span>New Task</span>
-        </button>
-
-        <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
-          <Search size={18} className="cursor-pointer" />
-          <div className="flex items-center space-x-2 border-l border-gray-300 dark:border-gray-600 pl-4">
-            <LayoutGrid size={16} />
-            <span>Board</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <ArrowRightFromLine size={16} className="rotate-90" />
-            <span>Gantt</span>
-          </div>
-          <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-2 py-1 rounded shadow-sm text-gray-900 dark:text-white">
-            <User size={14} />
-            <span className="font-medium">Bulk Assignments</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Filter size={14} />
-            <span>Filters</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Eye size={14} />
-            <span>Standard</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <LayoutGrid size={14} />
-            <span>Nothing</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Task List Header */}
-      <div className="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-2 grid grid-cols-12 text-xs font-semibold text-gray-500 dark:text-gray-400">
-        <div className="col-span-1 flex items-center space-x-2">
-          <input type="checkbox" className="rounded border-gray-300" />
-          <span>#</span>
-        </div>
-        <div className="col-span-4">Task Name</div>
-        <div className="col-span-2">Assignments</div>
-        <div className="col-span-1">Duration</div>
-        <div className="col-span-1">Pln Hrs</div>
-        <div className="col-span-1">Predecessors</div>
-        <div className="col-span-1">Start On</div>
-        <div className="col-span-1">Due On</div>
-        <div className="col-span-1 hidden md:block">% Complete</div>
-      </div>
-
-      {tasks.length > 0 ? (
-        <div className="flex-1 overflow-y-auto">
-          {tasks.map((task, index) => (
-            <div key={task.id} className="grid grid-cols-12 items-center px-6 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
-              <div className="col-span-1 flex items-center space-x-2">
-                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                <span className="text-gray-500 dark:text-gray-400">{index + 1}</span>
-              </div>
+          <div className="px-4 py-2">
+            {SIDEBAR_ITEMS.map((item) => (
               <div
-                className="col-span-4 font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline truncate pr-4"
-                onClick={() => setSelectedTask(task)}
+                key={item.id}
+                onClick={() => setActiveTab(item.id === 'details' ? 'tasks' : item.id)}
+                className={`flex items-center space-x-3 px-4 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-colors ${(activeTab === item.id || (activeTab === 'tasks' && item.id === 'details'))
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-l-4 border-gray-900 dark:border-white pl-3'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white border-l-4 border-transparent pl-3'
+                  }`}
               >
-                {task.name}
+                <item.icon size={16} />
+                <span>{item.label}</span>
               </div>
-              <div className="col-span-2 flex items-center space-x-1 overflow-hidden">
-                {task.assignments.length > 0 ? (
-                  task.assignments.map(a => (
-                    <div key={a.id} className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 rounded-full pl-0.5 pr-2 py-0.5 max-w-full">
-                      <div className={`w-5 h-5 rounded-full ${a.color} text-white flex items-center justify-center text-[9px] font-bold shrink-0`}>
-                        {a.initials}
-                      </div>
-                      <span className="text-xs truncate">{a.name}</span>
-                    </div>
-                  ))
-                ) : (
-                  <span className="text-gray-400 text-xs italic">Unassigned</span>
-                )}
-              </div>
-              <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.duration}</div>
-              <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.plannedHours}</div>
-              <div className="col-span-1 text-gray-400"></div>
-              <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.startDate}</div>
-              <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.dueDate}</div>
-              <div className="col-span-1 hidden md:flex items-center space-x-2">
-                <div className="flex-1 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500" style={{ width: `${task.percentComplete}%` }}></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 overflow-hidden">
+
+          {activeTab === 'tasks' && (
+            <div className="h-full flex flex-col">
+              {/* Task Toolbar */}
+              <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
+                <div className="flex items-center space-x-2">
+                  <button className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 font-medium text-sm">
+                    <Plus size={16} />
+                    <span>Add new</span>
+                    <ChevronDown size={14} />
+                  </button>
                 </div>
-                <span className="text-xs text-gray-500">{task.percentComplete}%</span>
+
+                {/* Right Toolbar Items (Search, Board, etc.) */}
+                <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
+                  <Search size={18} className="cursor-pointer" />
+                  <div className="flex items-center space-x-2 border-l border-gray-300 dark:border-gray-600 pl-4">
+                    <LayoutGrid size={16} />
+                    <span>Board</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <ArrowRightFromLine size={16} className="rotate-90" />
+                    <span>Gantt</span>
+                  </div>
+                  <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-2 py-1 rounded shadow-sm text-gray-900 dark:text-white">
+                    <User size={14} />
+                    <span className="font-medium">Bulk Assignments</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Filter size={14} />
+                    <span>Filters</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Eye size={14} />
+                    <span>Standard</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <LayoutGrid size={14} />
+                    <span>Nothing</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Task List Header */}
+              <div className="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-2 grid grid-cols-12 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                {/* ... header columns ... */}
+                <div className="col-span-1 flex items-center space-x-2">
+                  <input type="checkbox" className="rounded border-gray-300" />
+                  <span>#</span>
+                </div>
+                <div className="col-span-4">Task Name</div>
+                <div className="col-span-2">Assignments</div>
+                <div className="col-span-1">Duration</div>
+                <div className="col-span-1">Pln Hrs</div>
+                <div className="col-span-1">Predecessors</div>
+                <div className="col-span-1">Start On</div>
+                <div className="col-span-1">Due On</div>
+              </div>
+
+              {/* Task List Content */}
+              {tasks.length > 0 ? (
+                <div className="flex-1 overflow-y-auto">
+                  {tasks.map((task, index) => (
+                    <div key={task.id} className="grid grid-cols-12 items-center px-6 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
+                      <div className="col-span-1 flex items-center space-x-2">
+                        <span className="text-gray-500 dark:text-gray-400">{index + 1}</span>
+                      </div>
+                      <div
+                        className="col-span-4 font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline truncate pr-4"
+                        onClick={() => setSelectedTask(task)}
+                      >
+                        {task.name}
+                      </div>
+                      <div className="col-span-2 flex items-center space-x-1 overflow-hidden">
+                        {task.assignments.length > 0 ? (
+                          task.assignments.map(a => (
+                            <div key={a.id} className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 rounded-full pl-0.5 pr-2 py-0.5 max-w-full">
+                              <div className={`w-5 h-5 rounded-full ${a.color} text-white flex items-center justify-center text-[9px] font-bold shrink-0`}>
+                                {a.initials}
+                              </div>
+                              <span className="text-xs truncate">{a.name}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">Unassigned</span>
+                        )}
+                      </div>
+                      <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.duration}</div>
+                      <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.plannedHours}</div>
+                      <div className="col-span-1 text-gray-400"></div>
+                      <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.startDate}</div>
+                      <div className="col-span-1 text-gray-600 dark:text-gray-300">{task.dueDate}</div>
+
+                    </div>
+                  ))}
+                  <div className="px-6 py-3">
+                    <button
+                      onClick={() => setIsNewTaskModalOpen(true)}
+                      className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline flex items-center space-x-1"
+                    >
+                      <Plus size={14} />
+                      <span>Add More Tasks</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                  <div className="w-full px-6 py-3 border-b border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => setIsNewTaskModalOpen(true)}
+                      className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline flex items-center space-x-1"
+                    >
+                      <Plus size={14} />
+                      <span>Start Adding Tasks</span>
+                    </button>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center pb-20">
+                    Tasks will show here as you add them.
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
-          <div className="px-6 py-3">
-            <button
-              onClick={() => setIsNewTaskModalOpen(true)}
-              className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline flex items-center space-x-1"
-            >
-              <Plus size={14} />
-              <span>Add More Tasks</span>
-            </button>
-          </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <div className="flex-1 p-6 bg-gray-50 dark:bg-gray-900/50 h-full overflow-y-auto">
+              {documents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                  <FileText size={48} className="mb-4 text-gray-300" />
+                  <p>No documents found for this project.</p>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-sm bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                    Documents ({documents.length})
+                  </div>
+                  {documents.map((doc, idx) => (
+                    <div key={idx} className="flex items-center p-4 hover:bg-gray-50 dark:hover:bg-gray-800 border-b last:border-0 border-gray-100 dark:border-gray-800 cursor-pointer group">
+                      <div className="mr-4">
+                        <FileText size={24} className="text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">{doc.name}</h4>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {doc.date} • {doc.size} • Uploaded by {doc.user}
+                        </div>
+                      </div>
+                      <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <MoreHorizontal size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        /* Empty State */
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-          <div className="w-full px-6 py-3">
-            <button
-              onClick={() => setIsNewTaskModalOpen(true)}
-              className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline flex items-center space-x-1"
-            >
-              <Plus size={14} />
-              <span>Start Adding Tasks</span>
-            </button>
-          </div>
-          <div className="flex-1 flex items-center justify-center pb-20">
-            Tasks will show here as you add them.
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
+
+
 
 // --- Timesheet Views ---
 
@@ -1946,6 +2127,7 @@ const ProgramView = ({ onBack }) => {
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'timesheets' | 'timesheet-detail' | 'project-detail'
+  const [selectedProject, setSelectedProject] = useState(null);
   const [widgets, setWidgets] = useState(['projects', 'mentions', 'todos']);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showNotification, setShowNotification] = useState(true);
@@ -1979,7 +2161,17 @@ export default function App() {
 
   const renderWidget = (id) => {
     switch (id) {
-      case 'projects': return <MyProjectsWidget onNavigate={setCurrentView} />;
+      case 'projects':
+        return (
+          <MyProjectsWidget
+            onNavigate={(view, project) => {
+              if (project) {
+                setSelectedProject(project);
+              }
+              setCurrentView(view);
+            }}
+          />
+        );
       case 'mentions': return <MentionsWidget />;
       case 'todos': return <TodosWidget />;
       default: return null;
@@ -2051,7 +2243,7 @@ export default function App() {
       case 'timesheet-detail':
         return <TimesheetDetailView onBack={() => setCurrentView('timesheets')} />;
       case 'project-detail':
-        return <ProjectDetailView onBack={() => setCurrentView('dashboard')} />;
+        return <ProjectDetailView project={selectedProject} onBack={() => setCurrentView('dashboard')} />;
       case 'program':
         return <ProgramView onBack={() => setCurrentView('dashboard')} />;
       default:
