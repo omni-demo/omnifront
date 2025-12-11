@@ -2321,19 +2321,21 @@ export default function App() {
 
               {/* Error Alert Box */}
               {showNotification && (
-                <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-4 rounded shadow-lg border-l-4 border-red-500 flex items-start space-x-3 max-w-lg animate-in fade-in slide-in-from-right-4 duration-500 relative group">
+                <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-4 rounded shadow-lg border-l-4 border-red-500 flex items-start space-x-3 max-w-lg animate-in fade-in slide-in-from-right-4 duration-500 relative group z-20">
                   <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
                   <div>
                     <h3 className="font-bold text-sm">The Home Workspace service is currently unavailable</h3>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed pr-6">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed pr-8">
                       Workspace customization has been disabled, changes to this workspace will not be saved.
                     </p>
                   </div>
                   <button
                     onClick={() => setShowNotification(false)}
-                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors cursor-pointer"
+                    aria-label="Close notification"
+                    title="Close"
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 </div>
               )}
